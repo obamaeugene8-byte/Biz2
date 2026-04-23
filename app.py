@@ -1,7 +1,8 @@
 from flask import Flask, render_template, request, redirect, session
 from config import Config
 from models import db, User, Task, License
-from datetime import datetime
+import uuid
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -11,6 +12,24 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
+
+# ---------------- ADMIN LICENSE CREATOR ----------------
+@app.route("/admin/create-license")
+def create_license():
+    code = str(uuid.uuid4()).replace("-", "")[:12].upper()
+
+    license = License(
+        code=code,
+        is_active=True,
+        expires_at=datetime.utcnow() + timedelta(days=30)
+    )
+
+    db.session.add(license)
+    db.session.commit()
+
+    return f"License created: {code}"
+
+
 # ---------------- LICENSE ACTIVATION ----------------
 @app.route("/activate", methods=["GET", "POST"])
 def activate():
@@ -19,14 +38,16 @@ def activate():
 
         license = License.query.filter_by(code=code, is_active=True).first()
 
-        if license:
-            if license.expires_at and license.expires_at < datetime.utcnow():
-                return "License expired"
+        if not license:
+            return "Invalid license code"
 
-            session["licensed"] = True
-            return redirect("/")
+        if license.expires_at and license.expires_at < datetime.utcnow():
+            return "License expired"
 
-        return "Invalid license code"
+        session["licensed"] = True
+        session["license_code"] = license.code
+
+        return redirect("/")
 
     return render_template("activate.html")
 
@@ -66,7 +87,7 @@ def users():
 
     if request.method == "POST":
         name = request.form["name"]
-        capacity = request.form["capacity"]
+        capacity = int(request.form["capacity"])
 
         user = User(name=name, weekly_capacity=capacity)
         db.session.add(user)
@@ -87,7 +108,7 @@ def tasks():
 
     if request.method == "POST":
         title = request.form["title"]
-        hours = request.form["hours"]
+        hours = int(request.form["hours"])
         user_id = request.form["user_id"]
 
         task = Task(title=title, estimated_hours=hours, user_id=user_id)
@@ -97,6 +118,13 @@ def tasks():
 
     tasks = Task.query.all()
     return render_template("tasks.html", tasks=tasks, users=users)
+
+
+# ---------------- LOGOUT ----------------
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/activate")
 
 
 if __name__ == "__main__":
