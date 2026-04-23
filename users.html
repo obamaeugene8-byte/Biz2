@@ -1,0 +1,13 @@
+<h2>Users</h2>
+
+<form method="POST">
+    <input name="name" placeholder="Name" required>
+    <input name="capacity" placeholder="Weekly Capacity" required>
+    <button type="submit">Add</button>
+</form>
+
+<ul>
+{% for u in users %}
+    <li>{{ u.name }} - {{ u.weekly_capacity }} hrs</li>
+{% endfor %}
+</ul>
