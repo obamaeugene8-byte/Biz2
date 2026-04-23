@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+</head>
+<body>
+
+<h2>Workload Dashboard</h2>
+
+<table border="1">
+    <tr>
+        <th>Name</th>
+        <th>Tasks</th>
+        <th>Hours</th>
+        <th>Capacity</th>
+        <th>Load %</th>
+    </tr>
+
+    {% for u in data %}
+    <tr>
+        <td>{{ u.name }}</td>
+        <td>{{ u.tasks }}</td>
+        <td>{{ u.hours }}</td>
+        <td>{{ u.capacity }}</td>
+        <td>
+            {% if u.load > 100 %}
+                <span style="color:red;">{{ u.load }}</span>
+            {% elif u.load > 70 %}
+                <span style="color:orange;">{{ u.load }}</span>
+            {% else %}
+                <span style="color:green;">{{ u.load }}</span>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+
+</table>
+
+</body>
+</html>
