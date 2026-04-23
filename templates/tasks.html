@@ -1,0 +1,20 @@
+<h2>Tasks</h2>
+
+<form method="POST">
+    <input name="title" placeholder="Task title" required>
+    <input name="hours" placeholder="Hours" required>
+
+    <select name="user_id">
+        {% for u in users %}
+        <option value="{{ u.id }}">{{ u.name }}</option>
+        {% endfor %}
+    </select>
+
+    <button type="submit">Add</button>
+</form>
+
+<ul>
+{% for t in tasks %}
+    <li>{{ t.title }} - {{ t.estimated_hours }} hrs</li>
+{% endfor %}
+</ul>
