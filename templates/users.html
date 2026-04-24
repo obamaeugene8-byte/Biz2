@@ -1,13 +1,106 @@
-<h2>Users</h2>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Users</title>
 
-<form method="POST">
-    <input name="name" placeholder="Name" required>
-    <input name="capacity" placeholder="Weekly Capacity" required>
-    <button type="submit">Add</button>
-</form>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+        }
 
-<ul>
-{% for u in users %}
-    <li>{{ u.name }} - {{ u.weekly_capacity }} hrs</li>
-{% endfor %}
-</ul>
+        h2 {
+            text-align: center;
+            color: #333;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        form {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: #007bff;
+        }
+
+        button {
+            padding: 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            background: #f8f9fa;
+            margin-bottom: 8px;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 5px solid #28a745;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .capacity {
+            font-weight: bold;
+            color: #555;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>👥 Team Members</h2>
+
+<div class="container">
+
+    <!-- USER FORM -->
+    <form method="POST">
+        <input name="name" placeholder="User name" required>
+        <input name="capacity" placeholder="Weekly capacity (hours)" required>
+        <button type="submit">Add User</button>
+    </form>
+
+    <!-- USER LIST -->
+    <ul>
+        {% for u in users %}
+        <li>
+            <span>{{ u.name }}</span>
+            <span class="capacity">{{ u.weekly_capacity }} hrs/week</span>
+        </li>
+        {% endfor %}
+    </ul>
+
+</div>
+
+</body>
+</html>
