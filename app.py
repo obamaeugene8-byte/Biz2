@@ -7,12 +7,16 @@ import os
 
 app = Flask(__name__)
 app.config.from_object(Config)
-app.secret_key = "super-secret-key"
+app.secret_key = os.environ.get("SECRET_KEY", "super-secret-key")
 
 db.init_app(app)
 
+# ---------------- SAFE DB INIT ----------------
 with app.app_context():
-    db.create_all()
+    try:
+        db.create_all()
+    except Exception as e:
+        print("DB init error:", e)
 
 
 # ---------------- ADMIN LICENSE CREATOR ----------------
@@ -20,12 +24,10 @@ with app.app_context():
 def create_license():
     code = str(uuid.uuid4()).replace("-", "")[:12].upper()
 
-    # Create company automatically
     company = Company(name=f"Company-{code[:5]}")
     db.session.add(company)
     db.session.commit()
 
-    # Create license linked to company
     license = License(
         code=code,
         is_active=True,
@@ -100,21 +102,13 @@ def users():
     company_id = session.get("company_id")
 
     if request.method == "POST":
-        name = request.form.get("name")
-        capacity = request.form.get("capacity")
-
-        if not name or not capacity:
-            return "Missing data"
-
         user = User(
-            name=name,
-            weekly_capacity=int(capacity),
+            name=request.form.get("name"),
+            weekly_capacity=int(request.form.get("capacity")),
             company_id=company_id
         )
-
         db.session.add(user)
         db.session.commit()
-
         return redirect("/users")
 
     users = User.query.filter_by(company_id=company_id).all()
@@ -128,27 +122,17 @@ def tasks():
         return redirect("/activate")
 
     company_id = session.get("company_id")
-
     users = User.query.filter_by(company_id=company_id).all()
 
     if request.method == "POST":
-        title = request.form.get("title")
-        hours = request.form.get("hours")
-        user_id = request.form.get("user_id")
-
-        if not title or not hours or not user_id:
-            return "Missing data"
-
         task = Task(
-            title=title,
-            estimated_hours=int(hours),
-            user_id=int(user_id),
+            title=request.form.get("title"),
+            estimated_hours=int(request.form.get("hours")),
+            user_id=int(request.form.get("user_id")),
             company_id=company_id
         )
-
         db.session.add(task)
         db.session.commit()
-
         return redirect("/tasks")
 
     tasks = Task.query.filter_by(company_id=company_id).all()
@@ -162,13 +146,7 @@ def logout():
     return redirect("/activate")
 
 
+# ---------------- RENDER SAFE ENTRY ----------------
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
-
-    
-
-
-
-    app.run(debug=True)
