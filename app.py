@@ -34,7 +34,7 @@ def create_license():
 @app.route("/activate", methods=["GET", "POST"])
 def activate():
     if request.method == "POST":
-        code = request.form["code"]
+        code = request.form.get("code")
 
         license = License.query.filter_by(code=code, is_active=True).first()
 
@@ -52,6 +52,37 @@ def activate():
     return render_template("activate.html")
 
 
+# ---------------- RECOMMENDATION ENGINE ----------------
+def get_recommendations(users):
+    recommendations = []
+
+    for user in users:
+        tasks = Task.query.filter_by(user_id=user.id).all()
+        total_hours = sum(t.estimated_hours or 0 for t in tasks)
+
+        capacity = user.weekly_capacity or 1
+        load = (total_hours / capacity) * 100
+
+        status = "OK"
+        suggestion = "Balanced workload"
+
+        if load > 100:
+            status = "OVERLOADED"
+            suggestion = "Reduce tasks or move work to another user"
+        elif load < 50:
+            status = "UNDERUSED"
+            suggestion = "Assign more tasks"
+
+        recommendations.append({
+            "name": user.name,
+            "load": round(load, 1),
+            "status": status,
+            "suggestion": suggestion
+        })
+
+    return recommendations
+
+
 # ---------------- DASHBOARD ----------------
 @app.route("/")
 def dashboard():
@@ -59,14 +90,16 @@ def dashboard():
         return redirect("/activate")
 
     users = User.query.all()
+    recommendations = get_recommendations(users)
 
     data = []
 
     for user in users:
         tasks = Task.query.filter_by(user_id=user.id).all()
-        total_hours = sum(t.estimated_hours for t in tasks)
+        total_hours = sum(t.estimated_hours or 0 for t in tasks)
 
-        load = (total_hours / user.weekly_capacity) * 100 if user.weekly_capacity else 0
+        capacity = user.weekly_capacity or 1
+        load = (total_hours / capacity) * 100
 
         data.append({
             "name": user.name,
@@ -76,7 +109,7 @@ def dashboard():
             "load": round(load, 1)
         })
 
-    return render_template("dashboard.html", data=data)
+    return render_template("dashboard.html", data=data, recommendations=recommendations)
 
 
 # ---------------- USERS ----------------
@@ -86,12 +119,20 @@ def users():
         return redirect("/activate")
 
     if request.method == "POST":
-        name = request.form["name"]
-        capacity = int(request.form["capacity"])
+        name = request.form.get("name")
+        capacity = request.form.get("capacity")
 
-        user = User(name=name, weekly_capacity=capacity)
+        if not name or not capacity:
+            return "Missing data"
+
+        user = User(
+            name=name,
+            weekly_capacity=int(capacity)
+        )
+
         db.session.add(user)
         db.session.commit()
+
         return redirect("/users")
 
     users = User.query.all()
@@ -107,13 +148,22 @@ def tasks():
     users = User.query.all()
 
     if request.method == "POST":
-        title = request.form["title"]
-        hours = int(request.form["hours"])
-        user_id = request.form["user_id"]
+        title = request.form.get("title")
+        hours = request.form.get("hours")
+        user_id = request.form.get("user_id")
 
-        task = Task(title=title, estimated_hours=hours, user_id=user_id)
+        if not title or not hours or not user_id:
+            return "Missing data"
+
+        task = Task(
+            title=title,
+            estimated_hours=int(hours),
+            user_id=int(user_id)
+        )
+
         db.session.add(task)
         db.session.commit()
+
         return redirect("/tasks")
 
     tasks = Task.query.all()
