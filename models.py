@@ -46,4 +46,4 @@ class License(db.Model):
 
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'))
 
-    created_at = db.Column(db.DateTime, default
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
