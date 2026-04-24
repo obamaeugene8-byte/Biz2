@@ -1,40 +1,134 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Dashboard</title>
+    <title>Workload Dashboard</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+        }
+
+        .top-bar {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            color: white;
+            display: inline-block;
+        }
+
+        .btn-users { background: #007bff; }
+        .btn-tasks { background: #28a745; }
+        .btn-logout { background: #dc3545; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        th {
+            background: #343a40;
+            color: white;
+            padding: 12px;
+        }
+
+        td {
+            padding: 12px;
+            text-align: center;
+        }
+
+        tr:nth-child(even) {
+            background: #f2f2f2;
+        }
+
+        .card {
+            background: white;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+        }
+
+        .recommendations {
+            margin-top: 30px;
+        }
+
+        .badge-red { color: red; font-weight: bold; }
+        .badge-orange { color: orange; font-weight: bold; }
+        .badge-green { color: green; font-weight: bold; }
+    </style>
 </head>
+
 <body>
 
-<h2>Workload Dashboard</h2>
+<h2>📊 Workload Dashboard</h2>
 
-<table border="1">
-    <tr>
-        <th>Name</th>
-        <th>Tasks</th>
-        <th>Hours</th>
-        <th>Capacity</th>
-        <th>Load %</th>
-    </tr>
+<div class="top-bar">
+    <a href="/users" class="btn btn-users">Manage Users</a>
+    <a href="/tasks" class="btn btn-tasks">Manage Tasks</a>
+    <a href="/logout" class="btn btn-logout">Logout</a>
+</div>
 
-    {% for u in data %}
-    <tr>
-        <td>{{ u.name }}</td>
-        <td>{{ u.tasks }}</td>
-        <td>{{ u.hours }}</td>
-        <td>{{ u.capacity }}</td>
-        <td>
-            {% if u.load > 100 %}
-                <span style="color:red;">{{ u.load }}</span>
-            {% elif u.load > 70 %}
-                <span style="color:orange;">{{ u.load }}</span>
-            {% else %}
-                <span style="color:green;">{{ u.load }}</span>
-            {% endif %}
-        </td>
-    </tr>
+<div class="card">
+    <table>
+        <tr>
+            <th>Name</th>
+            <th>Tasks</th>
+            <th>Hours</th>
+            <th>Capacity</th>
+            <th>Load %</th>
+        </tr>
+
+        {% for u in data %}
+        <tr>
+            <td>{{ u.name }}</td>
+            <td>{{ u.tasks }}</td>
+            <td>{{ u.hours }}</td>
+            <td>{{ u.capacity }}</td>
+            <td>
+                {% if u.load > 100 %}
+                    <span class="badge-red">{{ u.load }} 🔴</span>
+                {% elif u.load > 70 %}
+                    <span class="badge-orange">{{ u.load }} 🟠</span>
+                {% else %}
+                    <span class="badge-green">{{ u.load }} 🟢</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+
+<!-- 🔥 RECOMMENDATIONS SECTION -->
+<div class="card recommendations">
+    <h3>📌 Recommendations</h3>
+
+    {% for r in recommendations %}
+        <p>
+            <strong>{{ r.name }}</strong> —
+            {{ r.status }} →
+            {{ r.suggestion }}
+            ({{ r.load }}%)
+        </p>
     {% endfor %}
-
-</table>
+</div>
 
 </body>
 </html>
