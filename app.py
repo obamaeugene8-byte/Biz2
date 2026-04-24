@@ -1,16 +1,23 @@
 from flask import Flask, render_template, request, redirect, session
 from config import Config
-from models import db, User, Task, License
+from models import db, User, Task, License, Company
 import uuid
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.config.from_object(Config)
 app.secret_key = "super-secret-key"
+
 db.init_app(app)
 
 with app.app_context():
     db.create_all()
+
+    # Ensure at least one company exists
+    if not Company.query.first():
+        default_company = Company(name="Default Company")
+        db.session.add(default_company)
+        db.session.commit()
 
 
 # ---------------- ADMIN LICENSE CREATOR ----------------
@@ -45,42 +52,14 @@ def activate():
             return "License expired"
 
         session["licensed"] = True
-        session["license_code"] = license.code
+
+        # TEMP: assign all users to first company
+        company = Company.query.first()
+        session["company_id"] = company.id
 
         return redirect("/")
 
     return render_template("activate.html")
-
-
-# ---------------- RECOMMENDATION ENGINE ----------------
-def get_recommendations(users):
-    recommendations = []
-
-    for user in users:
-        tasks = Task.query.filter_by(user_id=user.id).all()
-        total_hours = sum(t.estimated_hours or 0 for t in tasks)
-
-        capacity = user.weekly_capacity or 1
-        load = (total_hours / capacity) * 100
-
-        status = "OK"
-        suggestion = "Balanced workload"
-
-        if load > 100:
-            status = "OVERLOADED"
-            suggestion = "Reduce tasks or move work to another user"
-        elif load < 50:
-            status = "UNDERUSED"
-            suggestion = "Assign more tasks"
-
-        recommendations.append({
-            "name": user.name,
-            "load": round(load, 1),
-            "status": status,
-            "suggestion": suggestion
-        })
-
-    return recommendations
 
 
 # ---------------- DASHBOARD ----------------
@@ -89,8 +68,9 @@ def dashboard():
     if not session.get("licensed"):
         return redirect("/activate")
 
-    users = User.query.all()
-    recommendations = get_recommendations(users)
+    company_id = session.get("company_id")
+
+    users = User.query.filter_by(company_id=company_id).all()
 
     data = []
 
@@ -109,7 +89,7 @@ def dashboard():
             "load": round(load, 1)
         })
 
-    return render_template("dashboard.html", data=data, recommendations=recommendations)
+    return render_template("dashboard.html", data=data)
 
 
 # ---------------- USERS ----------------
@@ -117,6 +97,8 @@ def dashboard():
 def users():
     if not session.get("licensed"):
         return redirect("/activate")
+
+    company_id = session.get("company_id")
 
     if request.method == "POST":
         name = request.form.get("name")
@@ -127,7 +109,8 @@ def users():
 
         user = User(
             name=name,
-            weekly_capacity=int(capacity)
+            weekly_capacity=int(capacity),
+            company_id=company_id
         )
 
         db.session.add(user)
@@ -135,7 +118,7 @@ def users():
 
         return redirect("/users")
 
-    users = User.query.all()
+    users = User.query.filter_by(company_id=company_id).all()
     return render_template("users.html", users=users)
 
 
@@ -145,7 +128,9 @@ def tasks():
     if not session.get("licensed"):
         return redirect("/activate")
 
-    users = User.query.all()
+    company_id = session.get("company_id")
+
+    users = User.query.filter_by(company_id=company_id).all()
 
     if request.method == "POST":
         title = request.form.get("title")
@@ -158,7 +143,8 @@ def tasks():
         task = Task(
             title=title,
             estimated_hours=int(hours),
-            user_id=int(user_id)
+            user_id=int(user_id),
+            company_id=company_id
         )
 
         db.session.add(task)
@@ -166,7 +152,8 @@ def tasks():
 
         return redirect("/tasks")
 
-    tasks = Task.query.all()
+    tasks = Task.query.filter_by(company_id=company_id).all()
+
     return render_template("tasks.html", tasks=tasks, users=users)
 
 
@@ -179,3 +166,8 @@ def logout():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+
+
+
+        
