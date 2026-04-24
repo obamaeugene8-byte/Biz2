@@ -23,6 +23,7 @@ class Task(db.Model):
     estimated_hours = db.Column(db.Integer, default=1)
 
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
 
     # optional future improvement (helps tracking creation time)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
