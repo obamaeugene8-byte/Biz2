@@ -1,20 +1,114 @@
-<h2>Tasks</h2>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tasks</title>
 
-<form method="POST">
-    <input name="title" placeholder="Task title" required>
-    <input name="hours" placeholder="Hours" required>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+        }
 
-    <select name="user_id">
-        {% for u in users %}
-        <option value="{{ u.id }}">{{ u.name }}</option>
+        h2 {
+            text-align: center;
+            color: #333;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        form {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input, select {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            outline: none;
+        }
+
+        input:focus, select:focus {
+            border-color: #007bff;
+        }
+
+        button {
+            padding: 10px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #218838;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            background: #f8f9fa;
+            margin-bottom: 8px;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 5px solid #007bff;
+        }
+
+        .meta {
+            font-size: 12px;
+            color: gray;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>📌 Task Manager</h2>
+
+<div class="container">
+
+    <!-- TASK FORM -->
+    <form method="POST">
+        <input name="title" placeholder="Task title" required>
+        <input name="hours" placeholder="Estimated hours" required>
+
+        <select name="user_id" required>
+            <option disabled selected>Select user</option>
+            {% for u in users %}
+            <option value="{{ u.id }}">{{ u.name }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit">Add Task</button>
+    </form>
+
+    <!-- TASK LIST -->
+    <ul>
+        {% for t in tasks %}
+        <li>
+            <strong>{{ t.title }}</strong>
+            <div class="meta">
+                {{ t.estimated_hours }} hrs
+            </div>
+        </li>
         {% endfor %}
-    </select>
+    </ul>
 
-    <button type="submit">Add</button>
-</form>
+</div>
 
-<ul>
-{% for t in tasks %}
-    <li>{{ t.title }} - {{ t.estimated_hours }} hrs</li>
-{% endfor %}
-</ul>
+</body>
+</html>
