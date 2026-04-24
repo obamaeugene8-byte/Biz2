@@ -13,22 +13,23 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
-    # Ensure at least one company exists
-    if not Company.query.first():
-        default_company = Company(name="Default Company")
-        db.session.add(default_company)
-        db.session.commit()
-
 
 # ---------------- ADMIN LICENSE CREATOR ----------------
 @app.route("/admin/create-license")
 def create_license():
     code = str(uuid.uuid4()).replace("-", "")[:12].upper()
 
+    # Create company automatically
+    company = Company(name=f"Company-{code[:5]}")
+    db.session.add(company)
+    db.session.commit()
+
+    # Create license linked to company
     license = License(
         code=code,
         is_active=True,
-        expires_at=datetime.utcnow() + timedelta(days=30)
+        expires_at=datetime.utcnow() + timedelta(days=30),
+        company_id=company.id
     )
 
     db.session.add(license)
@@ -52,10 +53,7 @@ def activate():
             return "License expired"
 
         session["licensed"] = True
-
-        # TEMP: assign all users to first company
-        company = Company.query.first()
-        session["company_id"] = company.id
+        session["company_id"] = license.company_id
 
         return redirect("/")
 
@@ -75,7 +73,7 @@ def dashboard():
     data = []
 
     for user in users:
-        tasks = Task.query.filter_by(user_id=user.id).all()
+        tasks = Task.query.filter_by(user_id=user.id, company_id=company_id).all()
         total_hours = sum(t.estimated_hours or 0 for t in tasks)
 
         capacity = user.weekly_capacity or 1
@@ -153,7 +151,6 @@ def tasks():
         return redirect("/tasks")
 
     tasks = Task.query.filter_by(company_id=company_id).all()
-
     return render_template("tasks.html", tasks=tasks, users=users)
 
 
@@ -166,8 +163,3 @@ def logout():
 
 if __name__ == "__main__":
     app.run(debug=True)
-
-
-
-
-        
