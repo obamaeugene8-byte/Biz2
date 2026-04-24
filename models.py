@@ -44,4 +44,6 @@ class License(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     expires_at = db.Column(db.DateTime, nullable=True)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    company_id = db.Column(db.Integer, db.ForeignKey('company.id'))
+
+    created_at = db.Column(db.DateTime, default
