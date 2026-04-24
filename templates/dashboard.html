@@ -1,78 +1,41 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Workload Dashboard</title>
+    <title>Dashboard</title>
 
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f4f6f9;
-            margin: 0;
-            padding: 20px;
+        body { font-family: Arial; background:#f4f6f9; padding:20px; }
+        h2 { text-align:center; }
+
+        .nav { text-align:center; margin-bottom:20px; }
+        .nav a {
+            padding:10px 15px;
+            margin:5px;
+            color:white;
+            text-decoration:none;
+            border-radius:5px;
         }
 
-        h2 {
-            text-align: center;
-            color: #333;
-        }
-
-        .top-bar {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
-        .btn {
-            padding: 10px 15px;
-            margin: 5px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            text-decoration: none;
-            color: white;
-            display: inline-block;
-        }
-
-        .btn-users { background: #007bff; }
-        .btn-tasks { background: #28a745; }
-        .btn-logout { background: #dc3545; }
+        .users { background:#007bff; }
+        .tasks { background:#28a745; }
+        .logout { background:#dc3545; }
 
         table {
-            width: 100%;
+            width:100%;
             border-collapse: collapse;
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
+            background:white;
+            border-radius:10px;
+            overflow:hidden;
         }
 
-        th {
-            background: #343a40;
-            color: white;
-            padding: 12px;
-        }
+        th { background:#333; color:white; padding:10px; }
+        td { padding:10px; text-align:center; }
 
-        td {
-            padding: 12px;
-            text-align: center;
-        }
+        tr:nth-child(even) { background:#f2f2f2; }
 
-        tr:nth-child(even) {
-            background: #f2f2f2;
-        }
-
-        .card {
-            background: white;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 10px;
-        }
-
-        .recommendations {
-            margin-top: 30px;
-        }
-
-        .badge-red { color: red; font-weight: bold; }
-        .badge-orange { color: orange; font-weight: bold; }
-        .badge-green { color: green; font-weight: bold; }
+        .green { color:green; font-weight:bold; }
+        .orange { color:orange; font-weight:bold; }
+        .red { color:red; font-weight:bold; }
     </style>
 </head>
 
@@ -80,55 +43,39 @@
 
 <h2>📊 Workload Dashboard</h2>
 
-<div class="top-bar">
-    <a href="/users" class="btn btn-users">Manage Users</a>
-    <a href="/tasks" class="btn btn-tasks">Manage Tasks</a>
-    <a href="/logout" class="btn btn-logout">Logout</a>
+<div class="nav">
+    <a href="/users" class="users">Users</a>
+    <a href="/tasks" class="tasks">Tasks</a>
+    <a href="/logout" class="logout">Logout</a>
 </div>
 
-<div class="card">
-    <table>
-        <tr>
-            <th>Name</th>
-            <th>Tasks</th>
-            <th>Hours</th>
-            <th>Capacity</th>
-            <th>Load %</th>
-        </tr>
+<table>
+    <tr>
+        <th>Name</th>
+        <th>Tasks</th>
+        <th>Hours</th>
+        <th>Capacity</th>
+        <th>Load %</th>
+    </tr>
 
-        {% for u in data %}
-        <tr>
-            <td>{{ u.name }}</td>
-            <td>{{ u.tasks }}</td>
-            <td>{{ u.hours }}</td>
-            <td>{{ u.capacity }}</td>
-            <td>
-                {% if u.load > 100 %}
-                    <span class="badge-red">{{ u.load }} 🔴</span>
-                {% elif u.load > 70 %}
-                    <span class="badge-orange">{{ u.load }} 🟠</span>
-                {% else %}
-                    <span class="badge-green">{{ u.load }} 🟢</span>
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </table>
-</div>
-
-<!-- 🔥 RECOMMENDATIONS SECTION -->
-<div class="card recommendations">
-    <h3>📌 Recommendations</h3>
-
-    {% for r in recommendations %}
-        <p>
-            <strong>{{ r.name }}</strong> —
-            {{ r.status }} →
-            {{ r.suggestion }}
-            ({{ r.load }}%)
-        </p>
+    {% for u in data %}
+    <tr>
+        <td>{{ u.name }}</td>
+        <td>{{ u.tasks }}</td>
+        <td>{{ u.hours }}</td>
+        <td>{{ u.capacity }}</td>
+        <td>
+            {% if u.load > 100 %}
+                <span class="red">{{ u.load }}</span>
+            {% elif u.load > 70 %}
+                <span class="orange">{{ u.load }}</span>
+            {% else %}
+                <span class="green">{{ u.load }}</span>
+            {% endif %}
+        </td>
+    </tr>
     {% endfor %}
-</div>
+</table>
 
 </body>
 </html>
