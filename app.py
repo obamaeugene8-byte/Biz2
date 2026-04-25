@@ -20,7 +20,24 @@ with app.app_context():
         print("DB init error:", e)
 
 
-# ---------------- LICENSE HELPER ----------------
+# ==================================================
+# 🔐 COOKIE HELPER (IMPORTANT FOR STABILITY)
+# ==================================================
+def set_auth_cookie(response, token):
+    response.set_cookie(
+        "auth_token",
+        token,
+        max_age=30 * 24 * 60 * 60,   # 30 days login persistence
+        httponly=True,
+        secure=True,                 # REQUIRED for Render HTTPS
+        samesite="Lax"
+    )
+    return response
+
+
+# ==================================================
+# 🔐 LICENSE HELPER
+# ==================================================
 def get_license():
     token = request.cookies.get("auth_token")
 
@@ -32,13 +49,18 @@ def get_license():
     if not license:
         return None
 
-    if license.expires_at and license.expires_at < datetime.utcnow():
+    if not license.expires_at:
+        return None
+
+    if license.expires_at < datetime.utcnow():
         return None
 
     return license
 
 
-# ---------------- ADMIN: CREATE 30-DAY LICENSE ----------------
+# ==================================================
+# 🧾 ADMIN: CREATE 30-DAY LICENSE
+# ==================================================
 @app.route("/admin/create-license")
 def create_license():
     code = str(uuid.uuid4()).replace("-", "")[:12].upper()
@@ -58,10 +80,12 @@ def create_license():
     db.session.add(license)
     db.session.commit()
 
-    return f"30-DAY LICENSE: {code}"
+    return f"30-DAY LICENSE CREATED: {code}"
 
 
-# ---------------- ADMIN: CREATE 24-HOUR TRIAL ----------------
+# ==================================================
+# 🧪 ADMIN: CREATE 24-HOUR TRIAL
+# ==================================================
 @app.route("/admin/create-trial")
 def create_trial():
     code = str(uuid.uuid4()).replace("-", "")[:12].upper()
@@ -81,14 +105,15 @@ def create_trial():
     db.session.add(license)
     db.session.commit()
 
-    return f"24-HOUR TRIAL LICENSE: {code}"
+    return f"24-HOUR TRIAL CREATED: {code}"
 
 
-# ---------------- ACTIVATION ----------------
+# ==================================================
+# 🔑 ACTIVATION ROUTE
+# ==================================================
 @app.route("/activate", methods=["GET", "POST"])
 def activate():
 
-    # auto-login if cookie valid
     license = get_license()
     if license:
         return redirect("/")
@@ -104,25 +129,20 @@ def activate():
         if license.expires_at and license.expires_at < datetime.utcnow():
             return "License expired"
 
-        # generate permanent auth token
-        license.auth_token = secrets.token_hex(32)
-        db.session.commit()
+        # generate auth token if not exists
+        if not license.auth_token:
+            license.auth_token = secrets.token_hex(32)
+            db.session.commit()
 
         response = make_response(redirect("/"))
-
-        response.set_cookie(
-            "auth_token",
-            license.auth_token,
-            max_age=30 * 24 * 60 * 60,
-            httponly=True
-        )
-
-        return response
+        return set_auth_cookie(response, license.auth_token)
 
     return render_template("activate.html")
 
 
-# ---------------- DASHBOARD ----------------
+# ==================================================
+# 📊 DASHBOARD
+# ==================================================
 @app.route("/")
 def dashboard():
     license = get_license()
@@ -131,7 +151,6 @@ def dashboard():
         return redirect("/activate")
 
     company_id = license.company_id
-
     users = User.query.filter_by(company_id=company_id).all()
 
     data = []
@@ -161,20 +180,13 @@ def dashboard():
             "recommendation": recommendation
         })
 
-    # IMPORTANT: refresh cookie to prevent random logout
     response = make_response(render_template("dashboard.html", data=data))
-
-    response.set_cookie(
-        "auth_token",
-        license.auth_token,
-        max_age=30 * 24 * 60 * 60,
-        httponly=True
-    )
-
-    return response
+    return set_auth_cookie(response, license.auth_token)
 
 
-# ---------------- USERS ----------------
+# ==================================================
+# 👥 USERS
+# ==================================================
 @app.route("/users", methods=["GET", "POST"])
 def users():
     license = get_license()
@@ -189,7 +201,7 @@ def users():
         capacity = request.form.get("capacity")
 
         if not name or not capacity:
-            return "Name and capacity are required"
+            return "Name and capacity required"
 
         try:
             capacity = int(capacity)
@@ -211,7 +223,9 @@ def users():
     return render_template("users.html", users=users)
 
 
-# ---------------- TASKS ----------------
+# ==================================================
+# 📌 TASKS
+# ==================================================
 @app.route("/tasks", methods=["GET", "POST"])
 def tasks():
     license = get_license()
@@ -228,7 +242,7 @@ def tasks():
         user_id = request.form.get("user_id")
 
         if not title or not hours or not user_id:
-            return "All fields are required"
+            return "All fields required"
 
         try:
             hours = int(hours)
@@ -252,7 +266,9 @@ def tasks():
     return render_template("tasks.html", tasks=tasks, users=users)
 
 
-# ---------------- LOGOUT ----------------
+# ==================================================
+# 🚪 LOGOUT
+# ==================================================
 @app.route("/logout")
 def logout():
     response = make_response(redirect("/activate"))
@@ -260,7 +276,11 @@ def logout():
     return response
 
 
-# ---------------- ENTRY POINT ----------------
+# ==================================================
+# 🚀 RUN APP
+# ==================================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
+        
