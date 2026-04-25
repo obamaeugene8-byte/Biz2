@@ -20,7 +20,7 @@ with app.app_context():
         print("DB init error:", e)
 
 
-# ---------------- LICENSE CHECK FUNCTION ----------------
+# ---------------- LICENSE HELPER ----------------
 def get_license():
     token = request.cookies.get("auth_token")
 
@@ -38,7 +38,7 @@ def get_license():
     return license
 
 
-# ---------------- ADMIN LICENSE CREATOR ----------------
+# ---------------- ADMIN: CREATE 30-DAY LICENSE ----------------
 @app.route("/admin/create-license")
 def create_license():
     code = str(uuid.uuid4()).replace("-", "")[:12].upper()
@@ -58,14 +58,37 @@ def create_license():
     db.session.add(license)
     db.session.commit()
 
-    return f"License created: {code}"
+    return f"30-DAY LICENSE: {code}"
 
 
-# ---------------- LICENSE ACTIVATION ----------------
+# ---------------- ADMIN: CREATE 24-HOUR TRIAL ----------------
+@app.route("/admin/create-trial")
+def create_trial():
+    code = str(uuid.uuid4()).replace("-", "")[:12].upper()
+
+    company = Company(name=f"Trial-{code[:5]}")
+    db.session.add(company)
+    db.session.commit()
+
+    license = License(
+        code=code,
+        is_active=True,
+        expires_at=datetime.utcnow() + timedelta(hours=24),
+        company_id=company.id,
+        auth_token=None
+    )
+
+    db.session.add(license)
+    db.session.commit()
+
+    return f"24-HOUR TRIAL LICENSE: {code}"
+
+
+# ---------------- ACTIVATION ----------------
 @app.route("/activate", methods=["GET", "POST"])
 def activate():
 
-    # AUTO LOGIN USING COOKIE
+    # auto-login if cookie valid
     license = get_license()
     if license:
         return redirect("/")
@@ -81,13 +104,12 @@ def activate():
         if license.expires_at and license.expires_at < datetime.utcnow():
             return "License expired"
 
-        # GENERATE PERMANENT TOKEN
+        # generate permanent auth token
         license.auth_token = secrets.token_hex(32)
         db.session.commit()
 
         response = make_response(redirect("/"))
 
-        # STORE TOKEN IN COOKIE (30 DAYS)
         response.set_cookie(
             "auth_token",
             license.auth_token,
@@ -139,7 +161,17 @@ def dashboard():
             "recommendation": recommendation
         })
 
-    return render_template("dashboard.html", data=data)
+    # IMPORTANT: refresh cookie to prevent random logout
+    response = make_response(render_template("dashboard.html", data=data))
+
+    response.set_cookie(
+        "auth_token",
+        license.auth_token,
+        max_age=30 * 24 * 60 * 60,
+        httponly=True
+    )
+
+    return response
 
 
 # ---------------- USERS ----------------
@@ -162,7 +194,7 @@ def users():
         try:
             capacity = int(capacity)
         except ValueError:
-            return "Capacity must be a valid number"
+            return "Capacity must be a number"
 
         user = User(
             name=name,
@@ -228,9 +260,7 @@ def logout():
     return response
 
 
-# ---------------- RENDER ENTRY ----------------
+# ---------------- ENTRY POINT ----------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
-    
