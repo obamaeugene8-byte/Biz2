@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, redirect, session
+from flask import Flask, render_template, request, redirect, make_response
 from config import Config
 from models import db, User, Task, License, Company
 import uuid
 from datetime import datetime, timedelta
 import os
+import secrets
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -19,6 +20,24 @@ with app.app_context():
         print("DB init error:", e)
 
 
+# ---------------- LICENSE CHECK FUNCTION ----------------
+def get_license():
+    token = request.cookies.get("auth_token")
+
+    if not token:
+        return None
+
+    license = License.query.filter_by(auth_token=token).first()
+
+    if not license:
+        return None
+
+    if license.expires_at and license.expires_at < datetime.utcnow():
+        return None
+
+    return license
+
+
 # ---------------- ADMIN LICENSE CREATOR ----------------
 @app.route("/admin/create-license")
 def create_license():
@@ -32,7 +51,8 @@ def create_license():
         code=code,
         is_active=True,
         expires_at=datetime.utcnow() + timedelta(days=30),
-        company_id=company.id
+        company_id=company.id,
+        auth_token=None
     )
 
     db.session.add(license)
@@ -41,24 +61,15 @@ def create_license():
     return f"License created: {code}"
 
 
-# ---------------- LICENSE ACTIVATION (UPDATED) ----------------
+# ---------------- LICENSE ACTIVATION ----------------
 @app.route("/activate", methods=["GET", "POST"])
 def activate():
 
-    # ---------------- AUTO-LOGIN IF ALREADY ACTIVATED ----------------
-    license_code = session.get("license_code")
-    company_id = session.get("company_id")
+    # AUTO LOGIN USING COOKIE
+    license = get_license()
+    if license:
+        return redirect("/")
 
-    if license_code and company_id:
-        license = License.query.filter_by(code=license_code).first()
-
-        if license and license.expires_at and license.expires_at > datetime.utcnow():
-            return redirect("/")  # SKIP ACTIVATION
-
-        # if expired → clear session
-        session.clear()
-
-    # ---------------- MANUAL ACTIVATION ----------------
     if request.method == "POST":
         code = request.form.get("code")
 
@@ -70,12 +81,21 @@ def activate():
         if license.expires_at and license.expires_at < datetime.utcnow():
             return "License expired"
 
-        # store activation state
-        session["licensed"] = True
-        session["company_id"] = license.company_id
-        session["license_code"] = license.code
+        # GENERATE PERMANENT TOKEN
+        license.auth_token = secrets.token_hex(32)
+        db.session.commit()
 
-        return redirect("/")
+        response = make_response(redirect("/"))
+
+        # STORE TOKEN IN COOKIE (30 DAYS)
+        response.set_cookie(
+            "auth_token",
+            license.auth_token,
+            max_age=30 * 24 * 60 * 60,
+            httponly=True
+        )
+
+        return response
 
     return render_template("activate.html")
 
@@ -83,10 +103,12 @@ def activate():
 # ---------------- DASHBOARD ----------------
 @app.route("/")
 def dashboard():
-    if not session.get("licensed"):
+    license = get_license()
+
+    if not license:
         return redirect("/activate")
 
-    company_id = session.get("company_id")
+    company_id = license.company_id
 
     users = User.query.filter_by(company_id=company_id).all()
 
@@ -99,7 +121,6 @@ def dashboard():
         capacity = user.weekly_capacity or 1
         load = (total_hours / capacity) * 100
 
-        # ----------- ADDED THIS PART ONLY -----------
         if load > 100:
             recommendation = "Overloaded - redistribute tasks"
         elif load > 80:
@@ -108,7 +129,6 @@ def dashboard():
             recommendation = "Can take more work"
         else:
             recommendation = "Balanced"
-        # -------------------------------------------
 
         data.append({
             "name": user.name,
@@ -116,24 +136,26 @@ def dashboard():
             "hours": total_hours,
             "capacity": user.weekly_capacity,
             "load": round(load, 1),
-            "recommendation": recommendation   # ← added
+            "recommendation": recommendation
         })
 
     return render_template("dashboard.html", data=data)
 
+
 # ---------------- USERS ----------------
 @app.route("/users", methods=["GET", "POST"])
 def users():
-    if not session.get("licensed"):
+    license = get_license()
+
+    if not license:
         return redirect("/activate")
 
-    company_id = session.get("company_id")
+    company_id = license.company_id
 
     if request.method == "POST":
         name = request.form.get("name")
         capacity = request.form.get("capacity")
 
-        # ---------------- VALIDATION ----------------
         if not name or not capacity:
             return "Name and capacity are required"
 
@@ -142,10 +164,6 @@ def users():
         except ValueError:
             return "Capacity must be a valid number"
 
-        if not company_id:
-            return "Session expired. Please reactivate license."
-
-        # ---------------- CREATE USER ----------------
         user = User(
             name=name,
             weekly_capacity=capacity,
@@ -160,24 +178,42 @@ def users():
     users = User.query.filter_by(company_id=company_id).all()
     return render_template("users.html", users=users)
 
+
 # ---------------- TASKS ----------------
 @app.route("/tasks", methods=["GET", "POST"])
 def tasks():
-    if not session.get("licensed"):
+    license = get_license()
+
+    if not license:
         return redirect("/activate")
 
-    company_id = session.get("company_id")
+    company_id = license.company_id
     users = User.query.filter_by(company_id=company_id).all()
 
     if request.method == "POST":
+        title = request.form.get("title")
+        hours = request.form.get("hours")
+        user_id = request.form.get("user_id")
+
+        if not title or not hours or not user_id:
+            return "All fields are required"
+
+        try:
+            hours = int(hours)
+            user_id = int(user_id)
+        except ValueError:
+            return "Invalid input"
+
         task = Task(
-            title=request.form.get("title"),
-            estimated_hours=int(request.form.get("hours")),
-            user_id=int(request.form.get("user_id")),
+            title=title,
+            estimated_hours=hours,
+            user_id=user_id,
             company_id=company_id
         )
+
         db.session.add(task)
         db.session.commit()
+
         return redirect("/tasks")
 
     tasks = Task.query.filter_by(company_id=company_id).all()
@@ -187,14 +223,14 @@ def tasks():
 # ---------------- LOGOUT ----------------
 @app.route("/logout")
 def logout():
-    session.clear()
-    return redirect("/activate")
+    response = make_response(redirect("/activate"))
+    response.delete_cookie("auth_token")
+    return response
 
 
-# ---------------- RENDER ENTRY POINT ----------------
+# ---------------- RENDER ENTRY ----------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
 
-        
     
