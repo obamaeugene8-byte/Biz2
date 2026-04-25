@@ -41,9 +41,24 @@ def create_license():
     return f"License created: {code}"
 
 
-# ---------------- LICENSE ACTIVATION ----------------
+# ---------------- LICENSE ACTIVATION (UPDATED) ----------------
 @app.route("/activate", methods=["GET", "POST"])
 def activate():
+
+    # ---------------- AUTO-LOGIN IF ALREADY ACTIVATED ----------------
+    license_code = session.get("license_code")
+    company_id = session.get("company_id")
+
+    if license_code and company_id:
+        license = License.query.filter_by(code=license_code).first()
+
+        if license and license.expires_at and license.expires_at > datetime.utcnow():
+            return redirect("/")  # SKIP ACTIVATION
+
+        # if expired → clear session
+        session.clear()
+
+    # ---------------- MANUAL ACTIVATION ----------------
     if request.method == "POST":
         code = request.form.get("code")
 
@@ -55,8 +70,10 @@ def activate():
         if license.expires_at and license.expires_at < datetime.utcnow():
             return "License expired"
 
+        # store activation state
         session["licensed"] = True
         session["company_id"] = license.company_id
+        session["license_code"] = license.code
 
         return redirect("/")
 
@@ -146,7 +163,10 @@ def logout():
     return redirect("/activate")
 
 
-# ---------------- RENDER SAFE ENTRY ----------------
+# ---------------- RENDER ENTRY POINT ----------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
+        
+    
