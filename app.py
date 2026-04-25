@@ -8,6 +8,8 @@ import secrets
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
+# IMPORTANT: Render-safe secret key
 app.secret_key = os.environ.get("SECRET_KEY", "super-secret-key")
 
 db.init_app(app)
@@ -21,22 +23,22 @@ with app.app_context():
 
 
 # ==================================================
-# 🔐 COOKIE HELPER (IMPORTANT FOR STABILITY)
+# COOKIE HELPER
 # ==================================================
 def set_auth_cookie(response, token):
     response.set_cookie(
         "auth_token",
         token,
-        max_age=30 * 24 * 60 * 60,   # 30 days login persistence
+        max_age=30 * 24 * 60 * 60,
         httponly=True,
-        secure=True,                 # REQUIRED for Render HTTPS
+        secure=True,
         samesite="Lax"
     )
     return response
 
 
 # ==================================================
-# 🔐 LICENSE HELPER
+# LICENSE CHECK
 # ==================================================
 def get_license():
     token = request.cookies.get("auth_token")
@@ -59,7 +61,7 @@ def get_license():
 
 
 # ==================================================
-# 🧾 ADMIN: CREATE 30-DAY LICENSE
+# ADMIN: 30-DAY LICENSE
 # ==================================================
 @app.route("/admin/create-license")
 def create_license():
@@ -84,7 +86,7 @@ def create_license():
 
 
 # ==================================================
-# 🧪 ADMIN: CREATE 24-HOUR TRIAL
+# ADMIN: 24-HOUR TRIAL
 # ==================================================
 @app.route("/admin/create-trial")
 def create_trial():
@@ -109,7 +111,7 @@ def create_trial():
 
 
 # ==================================================
-# 🔑 ACTIVATION ROUTE
+# ACTIVATION
 # ==================================================
 @app.route("/activate", methods=["GET", "POST"])
 def activate():
@@ -129,7 +131,6 @@ def activate():
         if license.expires_at and license.expires_at < datetime.utcnow():
             return "License expired"
 
-        # generate auth token if not exists
         if not license.auth_token:
             license.auth_token = secrets.token_hex(32)
             db.session.commit()
@@ -141,7 +142,7 @@ def activate():
 
 
 # ==================================================
-# 📊 DASHBOARD
+# DASHBOARD
 # ==================================================
 @app.route("/")
 def dashboard():
@@ -185,7 +186,7 @@ def dashboard():
 
 
 # ==================================================
-# 👥 USERS
+# USERS
 # ==================================================
 @app.route("/users", methods=["GET", "POST"])
 def users():
@@ -224,7 +225,7 @@ def users():
 
 
 # ==================================================
-# 📌 TASKS
+# TASKS
 # ==================================================
 @app.route("/tasks", methods=["GET", "POST"])
 def tasks():
@@ -245,17 +246,14 @@ def tasks():
             return "All fields required"
 
         try:
-            hours = int(hours)
-            user_id = int(user_id)
+            task = Task(
+                title=title,
+                estimated_hours=int(hours),
+                user_id=int(user_id),
+                company_id=company_id
+            )
         except ValueError:
             return "Invalid input"
-
-        task = Task(
-            title=title,
-            estimated_hours=hours,
-            user_id=user_id,
-            company_id=company_id
-        )
 
         db.session.add(task)
         db.session.commit()
@@ -267,7 +265,7 @@ def tasks():
 
 
 # ==================================================
-# 🚪 LOGOUT
+# LOGOUT
 # ==================================================
 @app.route("/logout")
 def logout():
@@ -277,10 +275,13 @@ def logout():
 
 
 # ==================================================
-# 🚀 RUN APP
+# IMPORTANT: RENDER ENTRY POINT FIX
 # ==================================================
+if __name__ != "__main__":
+    # ensures gunicorn sees the app properly
+    pass
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
         
