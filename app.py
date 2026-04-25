@@ -119,18 +119,35 @@ def users():
     company_id = session.get("company_id")
 
     if request.method == "POST":
+        name = request.form.get("name")
+        capacity = request.form.get("capacity")
+
+        # ---------------- VALIDATION ----------------
+        if not name or not capacity:
+            return "Name and capacity are required"
+
+        try:
+            capacity = int(capacity)
+        except ValueError:
+            return "Capacity must be a valid number"
+
+        if not company_id:
+            return "Session expired. Please reactivate license."
+
+        # ---------------- CREATE USER ----------------
         user = User(
-            name=request.form.get("name"),
-            weekly_capacity=int(request.form.get("capacity")),
+            name=name,
+            weekly_capacity=capacity,
             company_id=company_id
         )
+
         db.session.add(user)
         db.session.commit()
+
         return redirect("/users")
 
     users = User.query.filter_by(company_id=company_id).all()
     return render_template("users.html", users=users)
-
 
 # ---------------- TASKS ----------------
 @app.route("/tasks", methods=["GET", "POST"])
