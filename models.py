@@ -46,4 +46,7 @@ class License(db.Model):
 
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'))
 
+    # ✅ NEW: persistent auth token
+    auth_token = db.Column(db.String(100), unique=True, nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
