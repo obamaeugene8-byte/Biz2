@@ -99,16 +99,27 @@ def dashboard():
         capacity = user.weekly_capacity or 1
         load = (total_hours / capacity) * 100
 
+        # ----------- ADDED THIS PART ONLY -----------
+        if load > 100:
+            recommendation = "Overloaded - redistribute tasks"
+        elif load > 80:
+            recommendation = "Near capacity"
+        elif load < 50:
+            recommendation = "Can take more work"
+        else:
+            recommendation = "Balanced"
+        # -------------------------------------------
+
         data.append({
             "name": user.name,
             "tasks": len(tasks),
             "hours": total_hours,
             "capacity": user.weekly_capacity,
-            "load": round(load, 1)
+            "load": round(load, 1),
+            "recommendation": recommendation   # ← added
         })
 
     return render_template("dashboard.html", data=data)
-
 
 # ---------------- USERS ----------------
 @app.route("/users", methods=["GET", "POST"])
