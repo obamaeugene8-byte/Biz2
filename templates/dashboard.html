@@ -36,6 +36,11 @@
         .green { color:green; font-weight:bold; }
         .orange { color:orange; font-weight:bold; }
         .red { color:red; font-weight:bold; }
+
+        /* NEW: recommendation styling */
+        .rec-ok { color:green; font-weight:bold; }
+        .rec-warn { color:orange; font-weight:bold; }
+        .rec-bad { color:red; font-weight:bold; }
     </style>
 </head>
 
@@ -56,6 +61,7 @@
     <th>Hours</th>
     <th>Capacity</th>
     <th>Load %</th>
+    <th>Recommendation</th> <!-- ✅ ADDED -->
 </tr>
 
 {% for u in data %}
@@ -73,11 +79,23 @@
             <span class="green">{{ u.load }}</span>
         {% endif %}
     </td>
+
+    <!-- ✅ ADDED RECOMMENDATION DISPLAY -->
+    <td>
+        {% if u.recommendation == "Overloaded - redistribute tasks" %}
+            <span class="rec-bad">{{ u.recommendation }}</span>
+        {% elif u.recommendation == "Near capacity" %}
+            <span class="rec-warn">{{ u.recommendation }}</span>
+        {% elif u.recommendation == "Can take more work" %}
+            <span class="rec-ok">{{ u.recommendation }}</span>
+        {% else %}
+            <span class="rec-ok">{{ u.recommendation }}</span>
+        {% endif %}
+    </td>
+
 </tr>
 {% endfor %}
 </table>
 
 </body>
 </html>
-
-     
