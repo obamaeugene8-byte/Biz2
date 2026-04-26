@@ -2,22 +2,33 @@
 <html>
 <head>
     <title>Users</title>
+
     <style>
-        body { font-family: Arial; background:#f4f6f9; padding:20px; }
+        body {
+            font-family: Arial;
+            background:#f4f6f9;
+            padding:20px;
+        }
 
         h2 { text-align:center; }
 
-        .nav { text-align:center; margin-bottom:20px; }
+        .nav {
+            text-align:center;
+            margin-bottom:20px;
+        }
+
         .nav a {
             padding:10px;
             margin:5px;
             color:white;
             text-decoration:none;
             border-radius:5px;
+            display:inline-block;
         }
 
         .dashboard { background:#007bff; }
         .tasks { background:#28a745; }
+        .logout { background:#dc3545; }
 
         .container {
             max-width:600px;
@@ -56,8 +67,12 @@
 <h2>👥 Users</h2>
 
 <div class="nav">
-    <a href="/" class="dashboard">Dashboard</a>
-    <a href="/tasks" class="tasks">Tasks</a>
+
+    <!-- 🔥 TOKEN MUST BE PASSED -->
+    <a href="/portal/{{ token }}" class="dashboard">Dashboard</a>
+    <a href="/tasks/{{ token }}" class="tasks">Tasks</a>
+    <a href="/logout" class="logout">Logout</a>
+
 </div>
 
 <div class="container">
@@ -67,6 +82,8 @@
     <input name="capacity" placeholder="Weekly Capacity" required>
     <button type="submit">Add User</button>
 </form>
+
+<hr>
 
 <ul>
 {% for u in users %}
