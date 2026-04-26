@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, make_response
+from flask import Flask, render_template, request, redirect
 from config import Config
 from models import db, User, Task, License, Company
 import uuid
@@ -21,39 +21,9 @@ with app.app_context():
 
 
 # ==================================================
-# 🔐 COOKIE HELPER (ALIGNED TO LICENSE EXPIRY)
+# 🔐 LICENSE HELPER (TOKEN ONLY)
 # ==================================================
-def set_auth_cookie(response, license):
-    if not license or not license.expires_at:
-        return response
-
-    max_age = int((license.expires_at - datetime.utcnow()).total_seconds())
-
-    if max_age <= 0:
-        return response
-
-    response.set_cookie(
-        "auth_token",
-        license.auth_token,
-        max_age=max_age,
-        httponly=True,
-        secure=False,          # 🔥 MUST be False unless HTTPS fully working
-        samesite="Lax"
-    )
-    return response
-
-
-# ==================================================
-# 🔐 LICENSE CHECK (COOKIE + URL FALLBACK)
-# ==================================================
-def get_license():
-    # 1️⃣ Try cookie
-    token = request.cookies.get("auth_token")
-
-    # 2️⃣ Fallback to URL
-    if not token:
-        token = request.args.get("token")
-
+def get_license_from_token(token):
     if not token:
         return None
 
@@ -90,11 +60,11 @@ def create_license():
     db.session.add(license)
     db.session.commit()
 
-    return f"30-DAY LICENSE: {code}"
+    return f"30-DAY LICENSE CREATED: {code}"
 
 
 # ==================================================
-# 🧪 ADMIN: CREATE 24-HOUR TRIAL
+# 🧪 ADMIN: 24-HOUR TRIAL
 # ==================================================
 @app.route("/admin/create-trial")
 def create_trial():
@@ -115,19 +85,14 @@ def create_trial():
     db.session.add(license)
     db.session.commit()
 
-    return f"24-HOUR TRIAL: {code}"
+    return f"24-HOUR TRIAL CREATED: {code}"
 
 
 # ==================================================
-# 🔑 ACTIVATION
+# 🔑 ACTIVATION (GENERATES LOGIN LINK)
 # ==================================================
 @app.route("/activate", methods=["GET", "POST"])
 def activate():
-
-    # auto-login if already valid
-    license = get_license()
-    if license:
-        return redirect("/")
 
     if request.method == "POST":
         code = request.form.get("code")
@@ -137,43 +102,44 @@ def activate():
         if not license:
             return "Invalid license code"
 
-        if license.expires_at and license.expires_at < datetime.utcnow():
+        if license.expires_at < datetime.utcnow():
             return "License expired"
 
         # generate token once
         if not license.auth_token:
-            license.auth_token = secrets.token_hex(32)
+            license.auth_token = secrets.token_hex(16)  # shorter + manageable
             db.session.commit()
 
-        login_link = f"/?token={license.auth_token}"
+        return f"""
+        <h2>✅ Activated Successfully</h2>
 
-        response = make_response(f"""
-        <h3>✅ Activated successfully</h3>
+        <p>Your login link (SAVE THIS):</p>
 
-        <p><b>Bookmark this link (VERY IMPORTANT):</b></p>
-        <a href="{login_link}">{login_link}</a>
+        <a href="/portal/{license.auth_token}">
+            /portal/{license.auth_token}
+        </a>
 
         <br><br>
 
-        <a href="{login_link}">Go to Dashboard</a>
-        """)
-
-        return set_auth_cookie(response, license)
+        <p>Bookmark this link — this is your login system.</p>
+        """
 
     return render_template("activate.html")
 
 
 # ==================================================
-# 📊 DASHBOARD
+# 🔐 MAIN LOGIN (ONLY ENTRY POINT)
 # ==================================================
-@app.route("/")
-def dashboard():
-    license = get_license()
+@app.route("/portal/<token>")
+def portal(token):
+
+    license = get_license_from_token(token)
 
     if not license:
         return redirect("/activate")
 
     company_id = license.company_id
+
     users = User.query.filter_by(company_id=company_id).all()
 
     data = []
@@ -185,14 +151,12 @@ def dashboard():
         capacity = user.weekly_capacity or 1
         load = (total_hours / capacity) * 100
 
-        if load > 100:
-            recommendation = "Overloaded"
-        elif load > 80:
-            recommendation = "Near capacity"
-        elif load < 50:
-            recommendation = "Can take more work"
-        else:
-            recommendation = "Balanced"
+        recommendation = (
+            "Overloaded" if load > 100 else
+            "Near capacity" if load > 80 else
+            "Can take more work" if load < 50 else
+            "Balanced"
+        )
 
         data.append({
             "name": user.name,
@@ -203,19 +167,16 @@ def dashboard():
             "recommendation": recommendation
         })
 
-    response = make_response(render_template("dashboard.html", data=data))
-
-    # 🔥 Always refresh cookie
-    return set_auth_cookie(response, license)
+    return render_template("dashboard.html", data=data)
 
 
 # ==================================================
 # 👥 USERS
 # ==================================================
-@app.route("/users", methods=["GET", "POST"])
-def users():
-    license = get_license()
+@app.route("/users/<token>", methods=["GET", "POST"])
+def users(token):
 
+    license = get_license_from_token(token)
     if not license:
         return redirect("/activate")
 
@@ -226,23 +187,18 @@ def users():
         capacity = request.form.get("capacity")
 
         if not name or not capacity:
-            return "Name and capacity required"
-
-        try:
-            capacity = int(capacity)
-        except ValueError:
-            return "Capacity must be a number"
+            return "Missing fields"
 
         user = User(
             name=name,
-            weekly_capacity=capacity,
+            weekly_capacity=int(capacity),
             company_id=company_id
         )
 
         db.session.add(user)
         db.session.commit()
 
-        return redirect("/users")
+        return redirect(f"/users/{token}")
 
     users = User.query.filter_by(company_id=company_id).all()
     return render_template("users.html", users=users)
@@ -251,10 +207,10 @@ def users():
 # ==================================================
 # 📌 TASKS
 # ==================================================
-@app.route("/tasks", methods=["GET", "POST"])
-def tasks():
-    license = get_license()
+@app.route("/tasks/<token>", methods=["GET", "POST"])
+def tasks(token):
 
+    license = get_license_from_token(token)
     if not license:
         return redirect("/activate")
 
@@ -262,45 +218,26 @@ def tasks():
     users = User.query.filter_by(company_id=company_id).all()
 
     if request.method == "POST":
-        title = request.form.get("title")
-        hours = request.form.get("hours")
-        user_id = request.form.get("user_id")
-
-        if not title or not hours or not user_id:
-            return "All fields required"
-
-        try:
-            task = Task(
-                title=title,
-                estimated_hours=int(hours),
-                user_id=int(user_id),
-                company_id=company_id
-            )
-        except ValueError:
-            return "Invalid input"
+        task = Task(
+            title=request.form.get("title"),
+            estimated_hours=int(request.form.get("hours")),
+            user_id=int(request.form.get("user_id")),
+            company_id=company_id
+        )
 
         db.session.add(task)
         db.session.commit()
 
-        return redirect("/tasks")
+        return redirect(f"/tasks/{token}")
 
     tasks = Task.query.filter_by(company_id=company_id).all()
     return render_template("tasks.html", tasks=tasks, users=users)
 
 
 # ==================================================
-# 🚪 LOGOUT
-# ==================================================
-@app.route("/logout")
-def logout():
-    response = make_response(redirect("/activate"))
-    response.delete_cookie("auth_token")
-    return response
-
-
-# ==================================================
-# 🚀 RUN (RENDER SAFE)
+# 🚀 RUN
 # ==================================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+
