@@ -21,7 +21,7 @@ with app.app_context():
 
 
 # ==================================================
-# 🔐 LICENSE HELPER (TOKEN ONLY)
+# 🔐 LICENSE HELPER (SAFE)
 # ==================================================
 def get_license_from_token(token):
     if not token:
@@ -32,64 +32,75 @@ def get_license_from_token(token):
     if not license:
         return None
 
-    if not license.expires_at or license.expires_at < datetime.utcnow():
+    # SAFE CHECK (prevents None crash)
+    if license.expires_at and license.expires_at < datetime.utcnow():
         return None
 
     return license
 
 
 # ==================================================
-# 🧾 ADMIN: CREATE 30-DAY LICENSE
+# 🧾 ADMIN: CREATE 30-DAY LICENSE (FIXED SAFE VERSION)
 # ==================================================
 @app.route("/admin/create-license")
 def create_license():
-    code = str(uuid.uuid4()).replace("-", "")[:12].upper()
+    try:
+        code = str(uuid.uuid4()).replace("-", "")[:12].upper()
 
-    company = Company(name=f"Company-{code[:5]}")
-    db.session.add(company)
-    db.session.commit()
+        company = Company(name=f"Company-{code[:5]}")
+        db.session.add(company)
+        db.session.commit()
 
-    license = License(
-        code=code,
-        is_active=True,
-        expires_at=datetime.utcnow() + timedelta(days=30),
-        company_id=company.id,
-        auth_token=None
-    )
+        license = License(
+            code=code,
+            is_active=True,
+            expires_at=datetime.utcnow() + timedelta(days=30),
+            company_id=company.id,
+            auth_token=None
+        )
 
-    db.session.add(license)
-    db.session.commit()
+        db.session.add(license)
+        db.session.commit()
 
-    return f"30-DAY LICENSE CREATED: {code}"
+        return f"30-DAY LICENSE CREATED: {code}"
+
+    except Exception as e:
+        db.session.rollback()
+        return f"ERROR (create-license): {str(e)}"
 
 
 # ==================================================
-# 🧪 ADMIN: 24-HOUR TRIAL
+# 🧪 ADMIN: 24-HOUR TRIAL (FIXED SAFE VERSION)
 # ==================================================
 @app.route("/admin/create-trial")
 def create_trial():
-    code = str(uuid.uuid4()).replace("-", "")[:12].upper()
+    try:
+        code = str(uuid.uuid4()).replace("-", "")[:12].upper()
 
-    company = Company(name=f"Trial-{code[:5]}")
-    db.session.add(company)
-    db.session.commit()
+        company = Company(name=f"Trial-{code[:5]}")
+        db.session.add(company)
+        db.session.commit()
 
-    license = License(
-        code=code,
-        is_active=True,
-        expires_at=datetime.utcnow() + timedelta(hours=24),
-        company_id=company.id,
-        auth_token=None
-    )
+        license = License(
+            code=code,
+            is_active=True,
+            expires_at=datetime.utcnow() + timedelta(hours=24),
+            company_id=company.id,
+            auth_token=None
+        )
 
-    db.session.add(license)
-    db.session.commit()
+        db.session.add(license)
+        db.session.commit()
 
-    return f"24-HOUR TRIAL CREATED: {code}"
+        return f"24-HOUR TRIAL CREATED: {code}"
+
+    except Exception as e:
+        db.session.rollback()
+        return f"ERROR (create-trial): {str(e)}"
 
 
 # ==================================================
-# 🔑 ACTIVATION (GENERATES LOGIN LINK)
+# 🔑 ACTIVATION
 # ==================================================
 @app.route("/activate", methods=["GET", "POST"])
 def activate():
@@ -102,12 +113,12 @@ def activate():
         if not license:
             return "Invalid license code"
 
-        if license.expires_at < datetime.utcnow():
+        if license.expires_at and license.expires_at < datetime.utcnow():
             return "License expired"
 
         # generate token once
         if not license.auth_token:
-            license.auth_token = secrets.token_hex(16)  # shorter + manageable
+            license.auth_token = secrets.token_hex(16)
             db.session.commit()
 
         return f"""
@@ -128,7 +139,7 @@ def activate():
 
 
 # ==================================================
-# 🔐 MAIN LOGIN (ONLY ENTRY POINT)
+# 🔐 PORTAL LOGIN
 # ==================================================
 @app.route("/portal/<token>")
 def portal(token):
@@ -240,4 +251,5 @@ def tasks(token):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+
 
