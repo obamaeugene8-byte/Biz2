@@ -2,18 +2,21 @@
 <html>
 <head>
     <title>Dashboard</title>
+
     <style>
         body { font-family: Arial; background:#f4f6f9; padding:20px; }
 
         h2 { text-align:center; color:#333; }
 
         .nav { text-align:center; margin-bottom:20px; }
+
         .nav a {
             padding:10px 15px;
             margin:5px;
             color:white;
             text-decoration:none;
             border-radius:5px;
+            display:inline-block;
         }
 
         .users { background:#007bff; }
@@ -37,7 +40,6 @@
         .orange { color:orange; font-weight:bold; }
         .red { color:red; font-weight:bold; }
 
-        /* NEW: recommendation styling */
         .rec-ok { color:green; font-weight:bold; }
         .rec-warn { color:orange; font-weight:bold; }
         .rec-bad { color:red; font-weight:bold; }
@@ -49,19 +51,23 @@
 <h2>📊 Workload Dashboard</h2>
 
 <div class="nav">
-    <a href="/users" class="users">Users</a>
-    <a href="/tasks" class="tasks">Tasks</a>
+
+    <!-- 🔥 TOKEN MUST BE PASSED FROM BACKEND -->
+    <a href="/users/{{ token }}" class="users">Users</a>
+    <a href="/tasks/{{ token }}" class="tasks">Tasks</a>
     <a href="/logout" class="logout">Logout</a>
+
 </div>
 
 <table>
+
 <tr>
     <th>Name</th>
     <th>Tasks</th>
     <th>Hours</th>
     <th>Capacity</th>
     <th>Load %</th>
-    <th>Recommendation</th> <!-- ✅ ADDED -->
+    <th>Recommendation</th>
 </tr>
 
 {% for u in data %}
@@ -70,6 +76,7 @@
     <td>{{ u.tasks }}</td>
     <td>{{ u.hours }}</td>
     <td>{{ u.capacity }}</td>
+
     <td>
         {% if u.load > 100 %}
             <span class="red">{{ u.load }}</span>
@@ -80,14 +87,11 @@
         {% endif %}
     </td>
 
-    <!-- ✅ ADDED RECOMMENDATION DISPLAY -->
     <td>
-        {% if u.recommendation == "Overloaded - redistribute tasks" %}
+        {% if "Overloaded" in u.recommendation %}
             <span class="rec-bad">{{ u.recommendation }}</span>
-        {% elif u.recommendation == "Near capacity" %}
+        {% elif "Near" in u.recommendation %}
             <span class="rec-warn">{{ u.recommendation }}</span>
-        {% elif u.recommendation == "Can take more work" %}
-            <span class="rec-ok">{{ u.recommendation }}</span>
         {% else %}
             <span class="rec-ok">{{ u.recommendation }}</span>
         {% endif %}
@@ -95,7 +99,9 @@
 
 </tr>
 {% endfor %}
+
 </table>
 
 </body>
 </html>
+
