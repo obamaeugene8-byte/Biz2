@@ -18,13 +18,20 @@
             padding:30px;
             border-radius:10px;
             text-align:center;
-            width:300px;
+            width:340px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
 
         input, button {
             width:100%;
             padding:10px;
             margin-top:10px;
+            font-size:14px;
+        }
+
+        input {
+            border:1px solid #ccc;
+            border-radius:5px;
         }
 
         button {
@@ -32,21 +39,48 @@
             color:white;
             border:none;
             cursor:pointer;
+            border-radius:5px;
         }
 
-        button:hover { background:#0056b3; }
+        button:hover {
+            background:#0056b3;
+        }
+
+        .info {
+            font-size:13px;
+            color:#666;
+            margin-top:15px;
+            line-height:1.4;
+        }
+
+        .note {
+            font-size:12px;
+            color:#999;
+            margin-top:10px;
+        }
     </style>
 </head>
 
 <body>
 
 <div class="box">
-    <h2>🔐 Enter Access Code</h2>
+
+    <h2>🔐 Activate Access</h2>
 
     <form method="POST">
-        <input name="code" placeholder="License code" required>
+        <input name="code" placeholder="Enter license code" required>
         <button type="submit">Activate</button>
     </form>
+
+    <div class="info">
+        After activation, you will receive a secure login link.
+        This link is your permanent access to the system until expiry.
+    </div>
+
+    <div class="note">
+        ⚠️ Save your login link. No password system is used.
+    </div>
+
 </div>
 
 </body>
