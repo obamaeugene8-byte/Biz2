@@ -8,20 +8,24 @@ import secrets
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
+# Render-safe secret
 app.secret_key = os.environ.get("SECRET_KEY", "super-secret-key")
 
 db.init_app(app)
 
-# ---------------- SAFE DB INIT ----------------
+# ==================================================
+# SAFE DATABASE INIT
+# ==================================================
 with app.app_context():
     try:
         db.create_all()
     except Exception as e:
-        print("DB init error:", e)
+        print("DB INIT ERROR:", e)
 
 
 # ==================================================
-# 🔐 LICENSE HELPER (SAFE)
+# HELPER: GET LICENSE
 # ==================================================
 def get_license_from_token(token):
     if not token:
@@ -32,7 +36,6 @@ def get_license_from_token(token):
     if not license:
         return None
 
-    # SAFE CHECK (prevents None crash)
     if license.expires_at and license.expires_at < datetime.utcnow():
         return None
 
@@ -40,12 +43,12 @@ def get_license_from_token(token):
 
 
 # ==================================================
-# 🧾 ADMIN: CREATE 30-DAY LICENSE (FIXED SAFE VERSION)
+# ADMIN: CREATE 30-DAY LICENSE
 # ==================================================
 @app.route("/admin/create-license")
 def create_license():
     try:
-        code = str(uuid.uuid4()).replace("-", "")[:12].upper()
+        code = uuid.uuid4().hex[:12].upper()
 
         company = Company(name=f"Company-{code[:5]}")
         db.session.add(company)
@@ -70,12 +73,12 @@ def create_license():
 
 
 # ==================================================
-# 🧪 ADMIN: 24-HOUR TRIAL (FIXED SAFE VERSION)
+# ADMIN: 24-HOUR TRIAL
 # ==================================================
 @app.route("/admin/create-trial")
 def create_trial():
     try:
-        code = str(uuid.uuid4()).replace("-", "")[:12].upper()
+        code = uuid.uuid4().hex[:12].upper()
 
         company = Company(name=f"Trial-{code[:5]}")
         db.session.add(company)
@@ -100,7 +103,7 @@ def create_trial():
 
 
 # ==================================================
-# 🔑 ACTIVATION
+# ACTIVATION (GENERATES LOGIN LINK)
 # ==================================================
 @app.route("/activate", methods=["GET", "POST"])
 def activate():
@@ -124,22 +127,21 @@ def activate():
         return f"""
         <h2>✅ Activated Successfully</h2>
 
-        <p>Your login link (SAVE THIS):</p>
+        <p><b>Your login link:</b></p>
 
         <a href="/portal/{license.auth_token}">
             /portal/{license.auth_token}
         </a>
 
         <br><br>
-
-        <p>Bookmark this link — this is your login system.</p>
+        <p>Save this link. It is your login system.</p>
         """
 
     return render_template("activate.html")
 
 
 # ==================================================
-# 🔐 PORTAL LOGIN
+# PORTAL (LOGIN SYSTEM)
 # ==================================================
 @app.route("/portal/<token>")
 def portal(token):
@@ -149,14 +151,16 @@ def portal(token):
     if not license:
         return redirect("/activate")
 
-    company_id = license.company_id
-
-    users = User.query.filter_by(company_id=company_id).all()
+    users = User.query.filter_by(company_id=license.company_id).all()
 
     data = []
 
     for user in users:
-        tasks = Task.query.filter_by(user_id=user.id, company_id=company_id).all()
+        tasks = Task.query.filter_by(
+            user_id=user.id,
+            company_id=license.company_id
+        ).all()
+
         total_hours = sum(t.estimated_hours or 0 for t in tasks)
 
         capacity = user.weekly_capacity or 1
@@ -173,7 +177,7 @@ def portal(token):
             "name": user.name,
             "tasks": len(tasks),
             "hours": total_hours,
-            "capacity": user.weekly_capacity,
+            "capacity": capacity,
             "load": round(load, 1),
             "recommendation": recommendation
         })
@@ -182,7 +186,7 @@ def portal(token):
 
 
 # ==================================================
-# 👥 USERS
+# USERS
 # ==================================================
 @app.route("/users/<token>", methods=["GET", "POST"])
 def users(token):
@@ -200,9 +204,14 @@ def users(token):
         if not name or not capacity:
             return "Missing fields"
 
+        try:
+            capacity = int(capacity)
+        except:
+            return "Invalid capacity"
+
         user = User(
             name=name,
-            weekly_capacity=int(capacity),
+            weekly_capacity=capacity,
             company_id=company_id
         )
 
@@ -211,12 +220,12 @@ def users(token):
 
         return redirect(f"/users/{token}")
 
-    users = User.query.filter_by(company_id=company_id).all()
-    return render_template("users.html", users=users)
+    users_list = User.query.filter_by(company_id=company_id).all()
+    return render_template("users.html", users=users_list)
 
 
 # ==================================================
-# 📌 TASKS
+# TASKS
 # ==================================================
 @app.route("/tasks/<token>", methods=["GET", "POST"])
 def tasks(token):
@@ -226,30 +235,35 @@ def tasks(token):
         return redirect("/activate")
 
     company_id = license.company_id
-    users = User.query.filter_by(company_id=company_id).all()
+    users_list = User.query.filter_by(company_id=company_id).all()
 
     if request.method == "POST":
-        task = Task(
-            title=request.form.get("title"),
-            estimated_hours=int(request.form.get("hours")),
-            user_id=int(request.form.get("user_id")),
-            company_id=company_id
-        )
+        try:
+            task = Task(
+                title=request.form.get("title"),
+                estimated_hours=int(request.form.get("hours")),
+                user_id=int(request.form.get("user_id")),
+                company_id=company_id
+            )
 
-        db.session.add(task)
-        db.session.commit()
+            db.session.add(task)
+            db.session.commit()
 
+        except Exception as e:
+            db.session.rollback()
+            return f"Error: {str(e)}"
+ + m to toggle the tab key moving focus. Alternatively
         return redirect(f"/tasks/{token}")
 
-    tasks = Task.query.filter_by(company_id=company_id).all()
-    return render_template("tasks.html", tasks=tasks, users=users)
+    tasks_list = Task.query.filter_by(company_id=company_id).all()
+    return render_template("tasks.html", tasks=tasks_list, users=users_list)
 
 
 # ==================================================
-# 🚀 RUN
+# RUN APP (RENDER SAFE)
 # ==================================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-
+    
