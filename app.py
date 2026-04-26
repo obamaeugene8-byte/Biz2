@@ -21,7 +21,7 @@ with app.app_context():
 
 
 # ==================================================
-# 🔐 COOKIE HELPER (MATCHES LICENSE EXPIRY)
+# 🔐 COOKIE HELPER (ALIGNED TO LICENSE EXPIRY)
 # ==================================================
 def set_auth_cookie(response, license):
     if not license or not license.expires_at:
@@ -37,17 +37,22 @@ def set_auth_cookie(response, license):
         license.auth_token,
         max_age=max_age,
         httponly=True,
-        secure=True,
+        secure=False,          # 🔥 MUST be False unless HTTPS fully working
         samesite="Lax"
     )
     return response
 
 
 # ==================================================
-# 🔐 LICENSE CHECK (COOKIE ONLY)
+# 🔐 LICENSE CHECK (COOKIE + URL FALLBACK)
 # ==================================================
 def get_license():
+    # 1️⃣ Try cookie
     token = request.cookies.get("auth_token")
+
+    # 2️⃣ Fallback to URL
+    if not token:
+        token = request.args.get("token")
 
     if not token:
         return None
@@ -64,7 +69,7 @@ def get_license():
 
 
 # ==================================================
-# 🧾 ADMIN: 30-DAY LICENSE
+# 🧾 ADMIN: CREATE 30-DAY LICENSE
 # ==================================================
 @app.route("/admin/create-license")
 def create_license():
@@ -89,7 +94,7 @@ def create_license():
 
 
 # ==================================================
-# 🧪 ADMIN: 24-HOUR TRIAL
+# 🧪 ADMIN: CREATE 24-HOUR TRIAL
 # ==================================================
 @app.route("/admin/create-trial")
 def create_trial():
@@ -114,28 +119,12 @@ def create_trial():
 
 
 # ==================================================
-# 🔗 LOGIN VIA LINK (THIS FIXES YOUR PROBLEM)
-# ==================================================
-@app.route("/login/<token>")
-def login_with_token(token):
-    license = License.query.filter_by(auth_token=token).first()
-
-    if not license:
-        return "Invalid login link"
-
-    if not license.expires_at or license.expires_at < datetime.utcnow():
-        return "License expired"
-
-    response = make_response(redirect("/"))
-    return set_auth_cookie(response, license)
-
-
-# ==================================================
 # 🔑 ACTIVATION
 # ==================================================
 @app.route("/activate", methods=["GET", "POST"])
 def activate():
 
+    # auto-login if already valid
     license = get_license()
     if license:
         return redirect("/")
@@ -151,19 +140,22 @@ def activate():
         if license.expires_at and license.expires_at < datetime.utcnow():
             return "License expired"
 
-        # generate token ONLY once
+        # generate token once
         if not license.auth_token:
             license.auth_token = secrets.token_hex(32)
             db.session.commit()
 
-        login_link = f"/login/{license.auth_token}"
+        login_link = f"/?token={license.auth_token}"
 
         response = make_response(f"""
         <h3>✅ Activated successfully</h3>
-        <p>Bookmark this link to always access your account:</p>
+
+        <p><b>Bookmark this link (VERY IMPORTANT):</b></p>
         <a href="{login_link}">{login_link}</a>
+
         <br><br>
-        <a href="/">Go to Dashboard</a>
+
+        <a href="{login_link}">Go to Dashboard</a>
         """)
 
         return set_auth_cookie(response, license)
@@ -212,6 +204,8 @@ def dashboard():
         })
 
     response = make_response(render_template("dashboard.html", data=data))
+
+    # 🔥 Always refresh cookie
     return set_auth_cookie(response, license)
 
 
@@ -239,7 +233,11 @@ def users():
         except ValueError:
             return "Capacity must be a number"
 
-        user = User(name=name, weekly_capacity=capacity, company_id=company_id)
+        user = User(
+            name=name,
+            weekly_capacity=capacity,
+            company_id=company_id
+        )
 
         db.session.add(user)
         db.session.commit()
@@ -301,8 +299,8 @@ def logout():
 
 
 # ==================================================
-# 🚀 RUN
+# 🚀 RUN (RENDER SAFE)
 # ==================================================
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
